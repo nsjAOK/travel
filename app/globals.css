@@ -22,7 +22,29 @@
   --bad: #9b1c1c;
   --bad-soft: #fde8e8;
   --panel: #f7f8fa;
+  --on-accent: #ffffff;
+  --on-ok: #ffffff;
   --display: "Space Grotesk", system-ui, sans-serif;
+}
+
+/* Dark theme: used when the system is dark (unless light is chosen) or when dark is chosen explicitly. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1217; --card: #161a21; --ink: #e7e9ee; --ink-2: #c4c9d3; --muted: #9aa2b1;
+    --line: #2a303b; --line-2: #232934; --field: #3b4351;
+    --accent: #8aa9ff; --accent-ink: #b7c9ff; --accent-soft: #1c2747; --chip: #1a2440; --chip-line: #2f3f6b;
+    --ok: #6fcf8f; --ok-soft: #15301f; --warn: #f0c27a; --warn-strong: #f5b56a; --warn-soft: #2b2212; --warn-line: #4a3a1c;
+    --tag-soft: #33240f; --bad: #ff9b9b; --bad-soft: #3a1717; --panel: #1b2029; --on-accent: #0b1220; --on-ok: #08140c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1217; --card: #161a21; --ink: #e7e9ee; --ink-2: #c4c9d3; --muted: #9aa2b1;
+  --line: #2a303b; --line-2: #232934; --field: #3b4351;
+  --accent: #8aa9ff; --accent-ink: #b7c9ff; --accent-soft: #1c2747; --chip: #1a2440; --chip-line: #2f3f6b;
+  --ok: #6fcf8f; --ok-soft: #15301f; --warn: #f0c27a; --warn-strong: #f5b56a; --warn-soft: #2b2212; --warn-line: #4a3a1c;
+  --tag-soft: #33240f; --bad: #ff9b9b; --bad-soft: #3a1717; --panel: #1b2029; --on-accent: #0b1220; --on-ok: #08140c;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -65,8 +87,8 @@ label.stack { display: flex; flex-direction: column; gap: 6px; font-weight: 500;
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--field); background: var(--card); font-weight: 500; cursor: pointer; text-decoration: none; color: var(--ink); }
 .btn:disabled { opacity: 0.55; cursor: default; }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-.btn-primary:hover { color: #fff; background: var(--accent-ink); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn-primary:hover { color: var(--on-accent); background: var(--accent-ink); }
 .btn-outline { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 .btn-big { height: 52px; font-size: 16px; width: 100%; }
 .btn-sm { min-height: 36px; padding: 0 12px; font-size: 14px; }
@@ -78,7 +100,7 @@ label.stack { display: flex; flex-direction: column; gap: 6px; font-weight: 500;
 .tag { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 13px; font-size: 12px; font-weight: 600; }
 .tag-member { background: var(--tag-soft); color: var(--warn-strong); }
 .tag-grey { background: var(--line-2); color: var(--ink-2); }
-.tag-accent { background: var(--accent); color: #fff; }
+.tag-accent { background: var(--accent); color: var(--on-accent); }
 .tag-sample { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-line); }
 
 .group-row { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 14px 0; border-top: 1px solid var(--line-2); }
@@ -112,7 +134,7 @@ label.stack { display: flex; flex-direction: column; gap: 6px; font-weight: 500;
 
 .bundle { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
 .rank { flex: 0 0 40px; height: 40px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 18px; background: var(--accent-soft); color: var(--accent-ink); }
-.rank.best { background: var(--accent); color: #fff; }
+.rank.best { background: var(--accent); color: var(--on-accent); }
 .total { font-family: var(--display); font-size: 32px; font-weight: 700; line-height: 1.1; }
 .legs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 20px; }
 .leg-card { background: var(--panel); border: 1px solid var(--line-2); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }

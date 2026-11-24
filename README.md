@@ -22,6 +22,16 @@ Then open http://localhost:3000.
 
 With no keys set, the app runs in **sample mode**: made-up offers that are clearly labelled. Every screen, filter and ranking step works the same way as with live data.
 
+## Run it inside Claude
+
+`npm run build:artifact` builds `artifact/dist/bundle-finder.html`, a single page that runs as a Claude artifact. It uses the same screens, filters and ranking as the app. Inside Claude it:
+
+- uses sample prices, because a Claude page can't call Duffel or hold API keys;
+- reads trip descriptions with Claude on the viewer's own account, after they allow it, and falls back to the built-in reader otherwise;
+- has no server: navigation uses `#plan`, `#search`, `#results` and `#guide-N`.
+
+The screens live in `components/views/`. Each host supplies navigation and data access: `components/WebApp.tsx` for the Next.js app, `artifact/main.tsx` for Claude.
+
 ## Keys (all optional)
 
 | Variable | What it turns on | Where to get it |

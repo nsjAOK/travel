@@ -1,7 +1,7 @@
-import type { Criteria } from "@/lib/types";
 import { parseHeuristic } from "./heuristic";
+import type { ParseResult } from "./types";
 
-export type ParseResult = { criteria: Criteria; reader: "claude" | "built-in"; warning?: string };
+export type { ParseResult };
 
 function hasClaudeCredentials(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_PROFILE);

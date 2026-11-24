@@ -4,3 +4,4 @@ node_modules
 .browser-profile
 next-env.d.ts
 *.tsbuildinfo
+artifact/dist

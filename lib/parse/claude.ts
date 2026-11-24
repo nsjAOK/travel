@@ -1,11 +1,10 @@
-// Reads a free-text trip description with Claude and returns Criteria.
+// Reads a free-text trip description with Claude (server side) and returns Criteria.
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import type { Criteria } from "@/lib/types";
-import { AIRPORTS } from "@/lib/airports";
 import { AMENITIES } from "@/lib/amenities";
-import { emptyCriteria, missingQuestions, ANY_TIME } from "./defaults";
+import { readerInstructions, toCriteria } from "./shared";
 
 const MODEL = "claude-opus-5-5";
 
@@ -49,20 +48,6 @@ const TripSchema = z.object({
   questions: z.array(z.string()).describe("short questions about anything important that is ambiguous"),
 });
 
-function systemPrompt(today: string): string {
-  const airports = AIRPORTS.map((a) => `${a.code} (${a.city})`).join(", ");
-  return [
-    "You turn a traveler's description of a vacation into search criteria for hotel + flight + rental car bundles.",
-    "Every value you set becomes a hard filter, so only set limits the traveler actually stated or clearly implied; use null or the widest window otherwise.",
-    `Today is ${today}. Dates without a year are the next time those dates come around.`,
-    "Use IATA airport codes. When the traveler names a city with several airports, choose the main one, and add a question if the choice matters.",
-    `Airports the app knows coordinates for: ${airports}.`,
-    "maxStops: 0 for nonstop only; 1 if they allow one stop; default 1 when not stated.",
-    "Time windows are local times at the airport where the leave or land happens. 'Land by 6 pm' means arrive window 00:00-18:00. 'Leave after 11 am' means 11:00-23:59.",
-    "If no car is mentioned, set car.needed true and vehicleClass null.",
-  ].join("\n");
-}
-
 export class ParseRefusedError extends Error {}
 
 export async function parseWithClaude(text: string, today = new Date()): Promise<Criteria> {
@@ -73,43 +58,11 @@ export async function parseWithClaude(text: string, today = new Date()): Promise
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
     output_config: { effort: "low", format: betaZodOutputFormat(TripSchema) },
-    system: systemPrompt(today.toISOString().slice(0, 10)),
+    system: readerInstructions(today.toISOString().slice(0, 10)),
     messages: [{ role: "user", content: text }],
   });
 
   if (response.stop_reason === "refusal") throw new ParseRefusedError("Claude declined to read this description.");
-  const p = response.parsed_output;
-  if (!p) throw new Error(`Could not read the trip description (stop reason: ${response.stop_reason}).`);
-
-  const c = emptyCriteria();
-  c.origin = (p.origin ?? "").toUpperCase();
-  c.destination = (p.destination ?? "").toUpperCase();
-  c.departDate = p.departDate ?? "";
-  c.returnDate = p.returnDate ?? "";
-  c.dateFlexDays = Math.max(0, p.dateFlexDays);
-  c.adults = Math.max(1, p.adults);
-  c.childAges = p.childAges;
-  c.hotel = {
-    ...c.hotel,
-    maxMilesFromAirport: p.hotel.maxMilesFromAirport ?? c.hotel.maxMilesFromAirport,
-    minStars: p.hotel.minStars,
-    minRating: p.hotel.minRating,
-    minBedrooms: p.hotel.minBedrooms,
-    minSqft: p.hotel.minSqft,
-    amenities: p.hotel.amenities,
-  };
-  const w = (x: { from: string; to: string }) => ({ from: x.from || ANY_TIME.from, to: x.to || ANY_TIME.to });
-  c.flight = {
-    cabin: p.flight.cabin,
-    maxStops: Math.max(0, p.flight.maxStops),
-    preferredAirlines: p.flight.preferredAirlines,
-    checkedBags: p.flight.checkedBags,
-    outbound: { depart: w(p.flight.outboundDepart), arrive: w(p.flight.outboundArrive) },
-    inbound: { depart: w(p.flight.returnDepart), arrive: w(p.flight.returnArrive) },
-  };
-  c.car = { needed: p.car.needed, vehicleClass: p.car.vehicleClass };
-  c.maxBudget = p.maxBudget;
-  c.notes = p.notes;
-  c.questions = [...new Set([...p.questions, ...missingQuestions(c)])];
-  return c;
+  if (!response.parsed_output) throw new Error(`Could not read the trip description (stop reason: ${response.stop_reason}).`);
+  return toCriteria(response.parsed_output);
 }
