@@ -1,0 +1,6 @@
+node_modules
+.next
+.env*.local
+.browser-profile
+next-env.d.ts
+*.tsbuildinfo
