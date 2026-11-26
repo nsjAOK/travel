@@ -8,7 +8,8 @@ import type { SourceInfo } from "@/lib/adapters";
 import { rankBundles } from "@/lib/engine/rank";
 import { hotelChecks } from "@/lib/engine/filter";
 import { fmtDate } from "@/lib/adapters/links";
-import { loadMemberships, loadTrip, money, saveBundles, saveResults, type Trip } from "@/lib/client/store";
+import { loadMemberships, loadTrip, money, saveSearch, tripKey, type Trip } from "@/lib/client/store";
+import type { Membership } from "@/lib/types";
 
 type Row = SourceInfo & { state: "queued" | "running" | SourceResult["status"]; result?: SourceResult };
 
@@ -24,6 +25,7 @@ const PILL: Record<Row["state"], [string, string]> = {
 export default function SearchView() {
   const { go, services } = useApp();
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
   const [rows, setRows] = useState<Row[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const started = useRef(false);
@@ -38,6 +40,7 @@ export default function SearchView() {
     }
     setTrip(t);
     const memberships = loadMemberships();
+    setMemberships(memberships);
     services.sources().then(({ sources }: { sources: SourceInfo[] }) => {
       const chosen = sources.filter((s) => t.sources.includes(s.id));
       setRows(chosen.map((s) => ({ ...s, state: "running" })));
@@ -76,14 +79,13 @@ export default function SearchView() {
     });
   }, [results, trip]);
 
-  const bundles = useMemo(() => (trip?.criteria && results.length ? rankBundles(trip.criteria, results, loadMemberships(), trip.options) : []), [results, trip]);
+  const bundles = useMemo(() => (trip?.criteria && results.length ? rankBundles(trip.criteria, results, memberships, trip.options) : []), [results, trip, memberships]);
 
   useEffect(() => {
     if (allDone) {
-      saveResults(results);
-      saveBundles(bundles);
+      if (trip) saveSearch({ key: tripKey(trip, memberships), trip, results, bundles });
     }
-  }, [allDone, results, bundles]);
+  }, [allDone, results, bundles, trip, memberships]);
 
   const c = trip?.criteria;
   const counts = {

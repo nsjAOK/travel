@@ -28,10 +28,14 @@ export const loadMemberships = () => read<Membership[]>("bf-memberships", DEFAUL
 export const saveMemberships = (m: Membership[]) => write("bf-memberships", m);
 export const loadTrip = () => read<Trip | null>("bf-trip", null);
 export const saveTrip = (t: Trip) => write("bf-trip", t);
-export const loadResults = () => read<SourceResult[]>("bf-results", []);
-export const saveResults = (r: SourceResult[]) => write("bf-results", r);
-export const loadBundles = () => read<Bundle[]>("bf-bundles", []);
-export const saveBundles = (b: Bundle[]) => write("bf-bundles", b);
+/** A finished search, saved with the exact trip and memberships it ran with, so results never show another trip's details. */
+export type SavedSearch = { key: string; trip: Trip; results: SourceResult[]; bundles: Bundle[] };
+
+/** Identifies what a search depends on: the trip's criteria, ranking options, sources and memberships. */
+export const tripKey = (t: Trip | null, m: Membership[]) => (t?.criteria ? JSON.stringify([t.criteria, t.options, [...t.sources].sort(), m]) : "");
+
+export const loadSearch = () => read<SavedSearch | null>("bf-search", null);
+export const saveSearch = (s: SavedSearch) => write("bf-search", s);
 export const loadBooked = (key: string) => read<Booked>(`bf-booked-${key}`, {});
 export const saveBooked = (key: string, v: Booked) => write(`bf-booked-${key}`, v);
 

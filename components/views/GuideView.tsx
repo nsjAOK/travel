@@ -6,7 +6,8 @@ import { BookingLink, BookingSteps } from "@/components/Steps";
 import { payLine } from "@/components/BundleParts";
 import type { Bundle } from "@/lib/types";
 import { fmtDate } from "@/lib/adapters/links";
-import { loadBooked, loadBundles, loadTrip, money, saveBooked, type Booked, type Trip } from "@/lib/client/store";
+import { priceChangeRule } from "@/lib/engine/rank";
+import { loadBooked, loadSearch, money, saveBooked, type Booked, type Trip } from "@/lib/client/store";
 
 export default function GuideView({ rank }: { rank: number }) {
   const [trip, setTrip] = useState<Trip | null>(null);
@@ -18,8 +19,9 @@ export default function GuideView({ rank }: { rank: number }) {
   const key = b ? `${b.title}-${b.effective}` : "";
 
   useEffect(() => {
-    setTrip(loadTrip());
-    setBundles(loadBundles());
+    const s = loadSearch();
+    setTrip(s?.trip ?? null);
+    setBundles(s?.bundles ?? []);
     setLoaded(true);
   }, []);
   useEffect(() => {
@@ -51,8 +53,7 @@ export default function GuideView({ rank }: { rank: number }) {
 
   const c = trip.criteria;
   const doneCount = b.steps.filter((_, i) => booked[i]?.done).length;
-  const next = bundles.find((x) => x.rank === b.rank + 1);
-  const headroom = next ? next.effective - b.effective : null;
+  const rule = priceChangeRule(bundles, b);
 
   return (
     <>
@@ -123,13 +124,17 @@ export default function GuideView({ rank }: { rank: number }) {
 
             <section className="card" aria-labelledby="change-h">
               <h2 id="change-h" style={{ marginBottom: 10 }}>If a price has changed</h2>
-              {headroom !== null ? (
+              {rule.kind === "headroom" ? (
                 <>
-                  <p style={{ margin: "0 0 12px", color: "var(--ink-2)" }}>Up by less than {money(headroom)}: book it. It's still cheaper than match #{b.rank + 1} ({money(next!.effective)}).</p>
+                  <p style={{ margin: "0 0 12px", color: "var(--ink-2)" }}>Up by less than {money(rule.amount)}: book it. It's still cheaper overall than match #{rule.than.rank} ({money(rule.than.effective)}).</p>
                   <p style={{ margin: "0 0 14px", color: "var(--ink-2)" }}>Up by more: stop and search again before booking anything else.</p>
                 </>
+              ) : rule.kind === "cheaper-exists" ? (
+                <p style={{ margin: "0 0 14px", color: "var(--ink-2)" }}>
+                  Match #{rule.than.rank} already costs less overall ({money(rule.than.effective)}, counting points). This one ranks higher because of how you sorted. If any price here has gone up, search again before booking.
+                </p>
               ) : (
-                <p style={{ margin: "0 0 14px", color: "var(--ink-2)" }}>This is the last match. If a price has gone up, search again before booking anything else.</p>
+                <p style={{ margin: "0 0 14px", color: "var(--ink-2)" }}>This is the only match. If a price has gone up, search again before booking anything else.</p>
               )}
               <NavLink to={{ name: "search" }} className="btn btn-outline" style={{ width: "100%" }}>Search again</NavLink>
             </section>

@@ -59,20 +59,38 @@ function windowFor(sentence: string, verbs: string): TimeWindow | null {
   return null;
 }
 
-function findAirports(text: string): string[] {
-  const hits: { code: string; at: number }[] = [];
+type AirportHit = { code: string; at: number; city: string; role: "from" | "to" | null; shared: boolean };
+
+/**
+ * Airports mentioned in the text, one per place in the text, in order. A city
+ * with several airports ("New York", "Washington") counts once, as the first
+ * airport listed for it, and is flagged so the reader can ask about it. The
+ * word just before a mention ("from", "to", "into") is kept as its role.
+ */
+export function findAirports(text: string): AirportHit[] {
+  const raw: { code: string; at: number; city: string }[] = [];
   const lower = text.toLowerCase();
   for (const a of AIRPORTS) {
-    const codeAt = text.search(new RegExp(String.raw`\b${a.code}\b`));
-    if (codeAt >= 0) hits.push({ code: a.code, at: codeAt });
+    for (const m of text.matchAll(new RegExp(String.raw`\b${a.code}\b`, "g"))) raw.push({ code: a.code, at: m.index!, city: a.city });
     for (const alias of [a.city.toLowerCase(), ...a.aliases]) {
       if (alias.length < 3) continue;
-      const at = lower.search(new RegExp(String.raw`\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\b`));
-      if (at >= 0) hits.push({ code: a.code, at });
+      const re = new RegExp(String.raw`\b${alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\b`, "g");
+      for (const m of lower.matchAll(re)) raw.push({ code: a.code, at: m.index!, city: a.city });
     }
   }
-  hits.sort((x, y) => x.at - y.at);
-  return [...new Set(hits.map((h) => h.code))];
+  // Group mentions that start at the same place (one city name, several airports).
+  const byPlace = new Map<number, typeof raw>();
+  for (const h of raw) byPlace.set(h.at, [...(byPlace.get(h.at) ?? []), h]);
+  const hits: AirportHit[] = [...byPlace.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([at, group]) => {
+      const before = lower.slice(Math.max(0, at - 14), at);
+      const role = /\bfrom\s+(?:the\s+)?$/.test(before) ? "from" : /\b(?:to|into|in)\s+(?:the\s+)?$/.test(before) ? "to" : null;
+      return { code: group[0].code, at, city: group[0].city, role, shared: new Set(group.map((g) => g.code)).size > 1 };
+    });
+  // Keep each airport once (first mention).
+  const seen = new Set<string>();
+  return hits.filter((h) => (seen.has(h.code) ? false : (seen.add(h.code), true)));
 }
 
 function findDates(text: string, today: Date): { depart: string; ret: string } | null {
@@ -118,13 +136,20 @@ export function parseHeuristic(text: string, today = new Date()): Criteria {
   const lower = text.toLowerCase();
   const sentences = text.split(/(?<=[.!?;])\s+|\n+/);
 
-  // Airports: "X to Y" order wins; otherwise first mention is the origin.
-  const codes = findAirports(text);
-  if (codes.length >= 2) {
-    c.origin = codes[0];
-    c.destination = codes[1];
-  } else if (codes.length === 1) {
-    c.destination = codes[0];
+  // Airports: "from X" and "to/into X" win; otherwise the first mention is the origin.
+  const hits = findAirports(text);
+  const from = hits.find((h) => h.role === "from");
+  const to = hits.find((h) => h.role === "to" && h !== from);
+  const rest = hits.filter((h) => h !== from && h !== to);
+  const origin = from ?? (hits.length >= 2 ? rest.shift() : undefined);
+  const destination = to ?? rest.shift();
+  c.origin = origin?.code ?? "";
+  c.destination = destination?.code ?? "";
+  const airportQuestions: string[] = [];
+  const sharedCities = [origin, destination].filter((h) => h?.shared);
+  for (const h of sharedCities) {
+    const others = AIRPORTS.filter((a) => a.city === h!.city && a.code !== h!.code).map((a) => a.code);
+    airportQuestions.push(`${h!.city} has more than one airport; we picked ${h!.code}. Change it if you meant ${others.join(" or ")}.`);
   }
 
   const dates = findDates(text, today);
@@ -197,6 +222,6 @@ export function parseHeuristic(text: string, today = new Date()): Criteria {
   if (budget) c.maxBudget = parseInt(budget[1].replace(/,/g, ""), 10);
   if (/refundable/.test(lower)) c.notes.push("Refundable fares and rates preferred");
 
-  c.questions = missingQuestions(c);
+  c.questions = [...airportQuestions, ...missingQuestions(c)];
   return c;
 }

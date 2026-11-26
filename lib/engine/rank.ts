@@ -1,6 +1,6 @@
 // Turns every source's offers into ranked hotel + flight + car bundles.
 import { carLabel } from "@/lib/cars";
-import type { Booking, Bundle, CarOffer, Criteria, FlightOffer, HotelOffer, Membership, PackageOffer, SourceResult } from "@/lib/types";
+import type { Booking, Bundle, CarOffer, Check, Criteria, FlightOffer, HotelOffer, Membership, PackageOffer, SourceResult } from "@/lib/types";
 import { pointsValue } from "@/lib/memberships";
 import { carChecks, confirmed, flightChecks, hotelChecks, hotelMiles, passes } from "./filter";
 
@@ -56,6 +56,8 @@ export function rankBundles(c: Criteria, results: SourceResult[], memberships: M
     .map((f) => ({ f, p: priceOf(f, memberships) }))
     .sort((a, b) => a.p.effective - b.p.effective || Number(preferred(b.f)) - Number(preferred(a.f)));
   const car = c.car.needed ? [...cars].sort((a, b) => a.cash - b.cash)[0] ?? null : null;
+  // A car was asked for but no source priced one: say so, and rank these after fully confirmed bundles.
+  const noCar: Check[] = c.car.needed && !car ? [{ label: "No car priced: book one separately", ok: null }] : [];
 
   const bundles: Omit<Bundle, "rank">[] = [];
 
@@ -82,7 +84,7 @@ export function rankBundles(c: Criteria, results: SourceResult[], memberships: M
       rewards,
       effective,
       milesFromAirport: hotelMiles(c, h),
-      checks: [...hotelChecks(c, h), ...flightChecks(c, f), ...(car ? carChecks(c, car) : [])],
+      checks: [...hotelChecks(c, h), ...flightChecks(c, f), ...(car ? carChecks(c, car) : noCar)],
       steps: stepsFor(f, h, car),
       sample: f.sample || h.sample || Boolean(car?.sample),
     });
@@ -129,4 +131,21 @@ export function rankBundles(c: Criteria, results: SourceResult[], memberships: M
     if (out.length >= opts.limit) break;
   }
   return out;
+}
+
+export type PriceRule =
+  | { kind: "headroom"; amount: number; than: Bundle } // still the best deal unless the price rises by `amount`
+  | { kind: "cheaper-exists"; than: Bundle } // another match already costs less overall (it ranked lower for another reason)
+  | { kind: "only" };
+
+/**
+ * How much a bundle's price may rise before another match becomes the better
+ * deal, by effective cost. Compares against the cheapest OTHER match, not the
+ * next rank, because ranks can follow cash, points or confirmed limits.
+ */
+export function priceChangeRule(bundles: Bundle[], b: Bundle): PriceRule {
+  const others = bundles.filter((x) => x !== b && x.rank !== b.rank);
+  if (others.length === 0) return { kind: "only" };
+  const than = others.reduce((m, x) => (x.effective < m.effective ? x : m));
+  return than.effective > b.effective ? { kind: "headroom", amount: than.effective - b.effective, than } : { kind: "cheaper-exists", than };
 }

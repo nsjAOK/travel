@@ -9,6 +9,7 @@ import type { RankOptions } from "@/lib/engine/rank";
 import { AMENITIES, amenityLabel } from "@/lib/amenities";
 import { findAirport } from "@/lib/airports";
 import { CAR_LABELS } from "@/lib/cars";
+import { searchBlocker } from "@/lib/parse/defaults";
 import { fmtDate } from "@/lib/adapters/links";
 import { loadMemberships, loadTrip, saveMemberships, saveTrip } from "@/lib/client/store";
 
@@ -186,7 +187,8 @@ export default function PlanView() {
   }, [criteria]);
 
   const unknownAirport = criteria && [criteria.origin, criteria.destination].find((code) => code && !findAirport(code));
-  const ready = Boolean(criteria && criteria.origin && criteria.destination && criteria.departDate && criteria.returnDate && !unknownAirport);
+  const blocker = criteria ? (unknownAirport ? `We don't know airport ${unknownAirport} yet.` : searchBlocker(criteria)) : null;
+  const ready = Boolean(criteria && !blocker);
   const questions = (criteria?.questions ?? []).filter((q) => !dismissed.includes(q));
   const chosen = sources.filter((s) => enabled.includes(s.id));
 
@@ -352,7 +354,7 @@ export default function PlanView() {
                 <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" strokeWidth="2" /><path d="M12 12l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                 Search {chosen.length} source{chosen.length === 1 ? "" : "s"}
               </button>
-              {!criteria ? <p className="small" style={{ margin: 0, textAlign: "center" }}>Read your trip first.</p> : !ready ? <p className="small" style={{ margin: 0, textAlign: "center" }}>Airports and dates are needed before searching.</p> : null}
+              {!criteria ? <p className="small" style={{ margin: 0, textAlign: "center" }}>Read your trip first.</p> : blocker ? <p className="small" role="status" style={{ margin: 0, textAlign: "center" }}>{blocker}</p> : null}
             </div>
           </aside>
         </div>

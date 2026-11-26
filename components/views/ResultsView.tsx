@@ -7,7 +7,8 @@ import { Checks, Legs, payLine } from "@/components/BundleParts";
 import type { Bundle, SourceResult } from "@/lib/types";
 import { nights } from "@/lib/adapters/sample";
 import { fmtDate } from "@/lib/adapters/links";
-import { loadBundles, loadResults, loadTrip, money, type Trip } from "@/lib/client/store";
+import { confirmed } from "@/lib/engine/filter";
+import { loadMemberships, loadSearch, loadTrip, money, tripKey, type Trip } from "@/lib/client/store";
 
 export default function ResultsView() {
   const { services } = useApp();
@@ -16,11 +17,15 @@ export default function ResultsView() {
   const [results, setResults] = useState<SourceResult[]>([]);
   const [open, setOpen] = useState<number | null>(1);
   const [loaded, setLoaded] = useState(false);
+  const [stale, setStale] = useState(false);
 
   useEffect(() => {
-    setTrip(loadTrip());
-    setBundles(loadBundles());
-    setResults(loadResults());
+    // Show the last finished search with the trip it ran for, never the trip being edited now.
+    const s = loadSearch();
+    setTrip(s?.trip ?? null);
+    setBundles(s?.bundles ?? []);
+    setResults(s?.results ?? []);
+    setStale(Boolean(s && tripKey(loadTrip(), loadMemberships()) !== s.key));
     setLoaded(true);
   }, []);
 
@@ -28,6 +33,8 @@ export default function ResultsView() {
   const manual = results.filter((r) => r.status === "manual" && r.manualSteps);
   const failed = results.filter((r) => r.status === "error");
   const anySample = bundles.some((b) => b.sample);
+  const unconfirmed = bundles.filter((b) => !confirmed(b.checks)).length;
+  const sortLabel = trip?.options.sortBy === "cash" ? "cash out of pocket" : trip?.options.sortBy === "points" ? "fewest points" : "effective cost";
 
   return (
     <>
@@ -45,17 +52,33 @@ export default function ResultsView() {
           <>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", justifyContent: "space-between", gap: 16 }}>
               <div>
-                <h1>{bundles.length} bundle{bundles.length === 1 ? "" : "s"} meet every limit</h1>
+                <h1>
+                  {unconfirmed === 0
+                    ? `${bundles.length} bundle${bundles.length === 1 ? "" : "s"} meet every limit`
+                    : `${bundles.length} bundle${bundles.length === 1 ? "" : "s"} found`}
+                </h1>
                 <p className="lede">
-                  {c.origin} → {c.destination} · {fmtDate(c.departDate)} – {fmtDate(c.returnDate)} · sorted by{" "}
-                  {trip!.options.sortBy === "cash" ? "cash out of pocket" : trip!.options.sortBy === "points" ? "fewest points" : "effective cost"}
+                  {c.origin} → {c.destination} · {fmtDate(c.departDate)} – {fmtDate(c.returnDate)} · sorted by {sortLabel}
                 </p>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <NavLink to={{ name: "search" }} className="btn">Refresh prices</NavLink>
+                <NavLink to={{ name: "search" }} className="btn">{stale ? "Search your current trip" : "Refresh prices"}</NavLink>
                 <NavLink to={{ name: "plan" }} className="btn">Edit constraints</NavLink>
               </div>
             </div>
+
+            {stale ? (
+              <p className="notice notice-info" style={{ marginTop: 16 }}>
+                These results are from your last finished search. You've changed the trip or your memberships since then, so search again to see matches for the current trip.
+              </p>
+            ) : null}
+            {unconfirmed > 0 ? (
+              <p className="notice" style={{ marginTop: 12 }}>
+                {unconfirmed === bundles.length
+                  ? "Some limits couldn't be confirmed from the sources' data for any of these bundles (shown with a ?). Check those before booking."
+                  : `Bundles that confirm every limit are listed first, sorted by ${sortLabel}. The last ${unconfirmed} have a limit the source didn't confirm (shown with a ?), so check it before booking.`}
+              </p>
+            ) : null}
 
             {anySample ? (
               <p className="notice" style={{ marginTop: 16 }}>

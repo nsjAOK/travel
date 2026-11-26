@@ -4,7 +4,7 @@
 // so check the first live search carefully.
 import type { Criteria, FlightOffer, HotelOffer } from "@/lib/types";
 import { findAirport } from "@/lib/airports";
-import { amenitiesIn } from "@/lib/amenities";
+import { listingAmenities } from "@/lib/amenities";
 import { flightBooking, hotelBooking } from "./links";
 
 const BASE = "https://api.duffel.com";
@@ -137,7 +137,7 @@ export async function duffelStays(c: Criteria): Promise<HotelOffer[]> {
         bedrooms: bedMatch ? parseInt(bedMatch[1], 10) : null,
         sqft: sqftMatch ? parseInt(sqftMatch[1], 10) : null,
         roomName,
-        amenities: amenitiesIn((acc.amenities ?? []).map((x) => `${x.type ?? ""} ${x.description ?? ""}`.replace(/_/g, " ")).join(" | ")),
+        amenities: listingAmenities((acc.amenities ?? []).map((x) => `${x.type ?? ""} ${x.description ?? ""}`.replace(/_/g, " ")).join(" | ")),
         cash: Math.round(parseFloat(r.cheapest_rate_total_amount)),
         payment: { kind: "cash" },
         credit: 0,
